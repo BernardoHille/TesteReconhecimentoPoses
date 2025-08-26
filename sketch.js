@@ -2,26 +2,21 @@ let video;
 let bodyPose;
 let poses = [];
 let connections;
-let coins = []; // Renomeado de 'balls' para 'coins' para clareza
-let coinSprite; // Variável para armazenar a imagem da moeda
+let balls = [];
+let spriteImg;              // <- imagem do sprite
 
 // 🎛️ Configurações fáceis:
-const COIN_SIZE = 40; // Tamanho do sprite da moeda (largura e altura)
-let COIN_SPEED = 3;
-let COIN_SPAWN_INTERVAL = 120; // em frames
+const BALL_RADIUS_BASE = 15; // base para colisão, será substituída por SPRITE_SIZE/2
+const SPRITE_SIZE = 40;      // tamanho que o sprite será desenhado (ajuste aqui)
+let BALL_SPEED = 3;          // velocidade da queda
+let BALL_SPAWN_INTERVAL = 120; // em frames (menor = mais frequente)
 
 let score = 0;
 let frameCounter = 0;
 
-// --- NOVO ---
-// A função preload() é executada antes do setup() e garante
-// que a imagem seja carregada antes do jogo começar.
 function preload() {
-  // Certifique-se de que o arquivo 'coin.webp' está na mesma pasta do seu sketch.
-  coinSprite = loadImage('coin.webp', 
-    () => console.log("Imagem da moeda carregada com sucesso!"),
-    () => console.error("Erro ao carregar a imagem 'coin.webp'. Verifique o nome e o caminho do arquivo.")
-  );
+  // Use WebP com alpha (ou PNG). Troque o caminho conforme seu projeto.
+  spriteImg = loadImage('assets/coin.webp');
 }
 
 async function setup() {
@@ -34,17 +29,13 @@ async function setup() {
   bodyPose = await ml5.bodyPose();
   bodyPose.detectStart(video, gotPoses);
   connections = bodyPose.getConnections();
-  
-  // --- NOVO ---
-  // Define o modo de desenho da imagem a partir do centro,
-  // o que facilita o cálculo de colisão.
-  imageMode(CENTER);
 
-  // Cria as moedas iniciais
+  // Começa com algumas "moedas"
   for (let i = 0; i < 10; i++) {
-    coins.push(createCoin());
+    balls.push(createBall());
   }
 
+  imageMode(CENTER);         // facilita centralizar o sprite na posição da “bolinha”
   textSize(32);
   textAlign(LEFT, TOP);
   fill(255);
@@ -52,78 +43,68 @@ async function setup() {
 
 function draw() {
   background(0);
-  
-  // --- BÔNUS ---
-  // Inverte a imagem do vídeo horizontalmente para criar um efeito de espelho,
-  // que é mais intuitivo para o jogador.
-  push();
-  translate(width, 0);
-  scale(-1, 1);
   image(video, 0, 0, width, height);
-  pop();
-
 
   // Pontuação
   fill(255);
-  stroke(0);
-  strokeWeight(4);
   text("Pontos: " + score, 10, 10);
 
-  // Geração de novas moedas
+  // Frequência (por frames)
   frameCounter++;
-  if (frameCounter % COIN_SPAWN_INTERVAL === 0) {
-    coins.push(createCoin());
+  if (frameCounter % BALL_SPAWN_INTERVAL === 0) {
+    balls.push(createBall());
   }
 
-  // Atualiza e desenha as moedas
-  for (let coin of coins) {
-    coin.y += COIN_SPEED;
+  // Atualiza e desenha sprites
+  for (let ball of balls) {
+    ball.y += BALL_SPEED;
 
-    // Se a moeda sair da tela, reseta sua posição
-    if (coin.y > height + coin.r) {
-      resetCoin(coin);
+    if (ball.y > height + ball.r) {
+      resetBall(ball);
     }
-    
-    // --- MUDANÇA PRINCIPAL ---
-    // Em vez de desenhar um círculo, desenhamos a imagem da moeda.
-    image(coinSprite, coin.x, coin.y, COIN_SIZE, COIN_SIZE);
+
+    noStroke();
+    if (spriteImg) {
+      image(spriteImg, ball.x, ball.y, SPRITE_SIZE, SPRITE_SIZE);
+    } else {
+      // fallback visual se a imagem não carregar
+      fill(0, 100, 255);
+      circle(ball.x, ball.y, ball.r * 2);
+    }
   }
 
-  // Desenha o esqueleto e verifica a colisão
+  // Colisão com esqueleto e keypoints
   for (let pose of poses) {
-    // Colisão com os "ossos" (conexões)
+    // Conexões (linhas)
     for (let conn of connections) {
       let a = pose.keypoints[conn[0]];
       let b = pose.keypoints[conn[1]];
       if (a.confidence > 0.1 && b.confidence > 0.1) {
-        // Descomente as 3 linhas abaixo para ver as linhas do esqueleto
-        // stroke(255, 0, 0);
-        // strokeWeight(2);
-        // line(a.x, a.y, b.x, b.y);
+        stroke(255, 0, 0);
+        strokeWeight(2);
+        line(a.x, a.y, b.x, b.y);
 
-        for (let coin of coins) {
-          // A lógica de colisão continua a mesma, usando um raio invisível
-          let d = distToSegment(coin.x, coin.y, a.x, a.y, b.x, b.y);
-          if (d < coin.r) { 
-            resetCoin(coin);
+        for (let ball of balls) {
+          let d = distToSegment(ball.x, ball.y, a.x, a.y, b.x, b.y);
+          if (d < ball.r) {
+            resetBall(ball);
             score++;
           }
         }
       }
     }
 
-    // Colisão com as "juntas" (keypoints)
+    // Pontos do corpo
     for (let k of pose.keypoints) {
       if (k.confidence > 0.1) {
-        // Descomente as 3 linhas abaixo para ver as juntas do esqueleto
-        // fill(0, 255, 0);
-        // noStroke();
-        // circle(k.x, k.y, 10);
+        fill(0, 255, 0);
+        noStroke();
+        circle(k.x, k.y, 10);
 
-        for (let coin of coins) {
-          let d = dist(k.x, k.y, coin.x, coin.y);
-          if (d < coin.r) {
-            resetCoin(coin);
+        for (let ball of balls) {
+          let d = dist(k.x, k.y, ball.x, ball.y);
+          if (d < ball.r) {
+            resetBall(ball);
             score++;
           }
         }
@@ -136,27 +117,29 @@ function gotPoses(results) {
   poses = results;
 }
 
-// Funções renomeadas para 'coin' para maior clareza
-function createCoin() {
+function createBall() {
+  // Usa raio baseado no tamanho do sprite para colisão aproximada circular
+  const r = SPRITE_SIZE / 2;
   return {
     x: random(width),
     y: random(-height, 0),
-    r: COIN_SIZE / 2 // O raio para colisão é metade do tamanho da imagem
+    r
   };
 }
 
-function resetCoin(coin) {
-  coin.x = random(width);
-  coin.y = random(-height / 2, -50);
+function resetBall(ball) {
+  ball.x = random(width);
+  ball.y = random(-50, -10);
+  ball.r = SPRITE_SIZE / 2; // garante que r acompanha o tamanho atual
 }
 
-// Responsividade ao redimensionar a janela
+// Responsivo
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   video.size(windowWidth, windowHeight);
 }
 
-// Função para calcular a distância de um ponto a um segmento de linha (sem alterações)
+// Distância de ponto a segmento
 function distToSegment(px, py, x1, y1, x2, y2) {
   let A = px - x1;
   let B = py - y1;
