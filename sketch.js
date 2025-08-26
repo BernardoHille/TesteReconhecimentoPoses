@@ -3,39 +3,49 @@ let bodyPose;
 let poses = [];
 let connections;
 let balls = [];
-let spriteImg;              // <- imagem do sprite
+let coinImg; // sprite da moeda
 
-// 🎛️ Configurações fáceis:
-const BALL_RADIUS_BASE = 15; // base para colisão, será substituída por SPRITE_SIZE/2
-const SPRITE_SIZE = 40;      // tamanho que o sprite será desenhado (ajuste aqui)
-let BALL_SPEED = 3;          // velocidade da queda
-let BALL_SPAWN_INTERVAL = 120; // em frames (menor = mais frequente)
+// 🎛️ Configurações
+const COIN_SIZE = 48;          // tamanho do sprite desenhado
+let BALL_SPEED = 3;            // velocidade de queda
+let BALL_SPAWN_INTERVAL = 1200; // em frames (menor = mais frequente)
 
 let score = 0;
 let frameCounter = 0;
 
-function preload() {
-  // Use WebP com alpha (ou PNG). Troque o caminho conforme seu projeto.
-  spriteImg = loadImage('coin.webp');
+// helper para carregar imagem em p5 v2 (sem preload)
+function loadImageAsync(path) {
+  return new Promise((resolve, reject) => {
+    loadImage(path, img => resolve(img), err => reject(err));
+  });
 }
 
 async function setup() {
   createCanvas(windowWidth, windowHeight);
 
+  // carrega sprite (ajuste o caminho se necessário)
+  try {
+    coinImg = await loadImageAsync('coin.webp'); 
+  } catch (e) {
+    console.error('Falha ao carregar coin.webp:', e);
+  }
+
+  // vídeo
   video = createCapture(VIDEO);
   video.size(width, height);
   video.hide();
 
+  // ml5 body pose
   bodyPose = await ml5.bodyPose();
   bodyPose.detectStart(video, gotPoses);
   connections = bodyPose.getConnections();
 
-  // Começa com algumas "moedas"
+  // moedas iniciais
   for (let i = 0; i < 10; i++) {
     balls.push(createBall());
   }
 
-  imageMode(CENTER);         // facilita centralizar o sprite na posição da “bolinha”
+  imageMode(CENTER);
   textSize(32);
   textAlign(LEFT, TOP);
   fill(255);
@@ -45,17 +55,17 @@ function draw() {
   background(0);
   image(video, 0, 0, width, height);
 
-  // Pontuação
+  // HUD
   fill(255);
   text("Pontos: " + score, 10, 10);
 
-  // Frequência (por frames)
+  // spawn por frames
   frameCounter++;
   if (frameCounter % BALL_SPAWN_INTERVAL === 0) {
     balls.push(createBall());
   }
 
-  // Atualiza e desenha sprites
+  // atualizar/desenhar moedas
   for (let ball of balls) {
     ball.y += BALL_SPEED;
 
@@ -63,19 +73,13 @@ function draw() {
       resetBall(ball);
     }
 
-    noStroke();
-    if (spriteImg) {
-      image(spriteImg, ball.x, ball.y, SPRITE_SIZE, SPRITE_SIZE);
-    } else {
-      // fallback visual se a imagem não carregar
-      fill(0, 100, 255);
-      circle(ball.x, ball.y, ball.r * 2);
-    }
+    // desenha sprite (sem fallback)
+    if (coinImg) image(coinImg, ball.x, ball.y, COIN_SIZE, COIN_SIZE);
   }
 
-  // Colisão com esqueleto e keypoints
+  // colisão com esqueleto e keypoints
   for (let pose of poses) {
-    // Conexões (linhas)
+    // conexões (linhas)
     for (let conn of connections) {
       let a = pose.keypoints[conn[0]];
       let b = pose.keypoints[conn[1]];
@@ -94,7 +98,7 @@ function draw() {
       }
     }
 
-    // Pontos do corpo
+    // pontos do corpo
     for (let k of pose.keypoints) {
       if (k.confidence > 0.1) {
         fill(0, 255, 0);
@@ -118,28 +122,27 @@ function gotPoses(results) {
 }
 
 function createBall() {
-  // Usa raio baseado no tamanho do sprite para colisão aproximada circular
-  const r = SPRITE_SIZE / 2;
+  // raio aproximado baseado no tamanho do sprite
   return {
     x: random(width),
     y: random(-height, 0),
-    r
+    r: COIN_SIZE / 2
   };
 }
 
 function resetBall(ball) {
   ball.x = random(width);
   ball.y = random(-50, -10);
-  ball.r = SPRITE_SIZE / 2; // garante que r acompanha o tamanho atual
+  ball.r = COIN_SIZE / 2;
 }
 
-// Responsivo
+// responsivo
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   video.size(windowWidth, windowHeight);
 }
 
-// Distância de ponto a segmento
+// distância ponto-segmento
 function distToSegment(px, py, x1, y1, x2, y2) {
   let A = px - x1;
   let B = py - y1;
@@ -151,16 +154,9 @@ function distToSegment(px, py, x1, y1, x2, y2) {
   let param = lenSq !== 0 ? dotProduct / lenSq : -1;
 
   let xx, yy;
-  if (param < 0) {
-    xx = x1;
-    yy = y1;
-  } else if (param > 1) {
-    xx = x2;
-    yy = y2;
-  } else {
-    xx = x1 + param * C;
-    yy = y1 + param * D;
-  }
+  if (param < 0) { xx = x1; yy = y1; }
+  else if (param > 1) { xx = x2; yy = y2; }
+  else { xx = x1 + param * C; yy = y1 + param * D; }
 
   let dx = px - xx;
   let dy = py - yy;
