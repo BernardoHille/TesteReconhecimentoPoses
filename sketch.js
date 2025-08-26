@@ -6,7 +6,7 @@ let balls = [];
 
 // --- moeda (sprite) ---
 let coinImg;
-const COIN_SIZE = 48; // tamanho desenhado do sprite (visual)
+const COIN_SIZE = 55; // tamanho desenhado do sprite (visual)
 
 // 🎛️ Configurações fáceis:
 const BALL_RADIUS = 15;      // <- colisão continua usando este raio
