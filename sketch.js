@@ -3,21 +3,14 @@ let bodyPose;
 let poses = [];
 let connections;
 let balls = [];
-let spriteImg;              // <- imagem do sprite
 
 // 🎛️ Configurações fáceis:
-const BALL_RADIUS_BASE = 15; // base para colisão, será substituída por SPRITE_SIZE/2
-const SPRITE_SIZE = 40;      // tamanho que o sprite será desenhado (ajuste aqui)
-let BALL_SPEED = 3;          // velocidade da queda
-let BALL_SPAWN_INTERVAL = 120; // em frames (menor = mais frequente)
+const BALL_RADIUS = 15;
+let BALL_SPEED = 3;
+let BALL_SPAWN_INTERVAL = 120; // em frames
 
 let score = 0;
 let frameCounter = 0;
-
-function preload() {
-  // Use WebP com alpha (ou PNG). Troque o caminho conforme seu projeto.
-  spriteImg = loadImage('assets/coin.webp');
-}
 
 async function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -30,12 +23,10 @@ async function setup() {
   bodyPose.detectStart(video, gotPoses);
   connections = bodyPose.getConnections();
 
-  // Começa com algumas "moedas"
   for (let i = 0; i < 10; i++) {
     balls.push(createBall());
   }
 
-  imageMode(CENTER);         // facilita centralizar o sprite na posição da “bolinha”
   textSize(32);
   textAlign(LEFT, TOP);
   fill(255);
@@ -49,13 +40,13 @@ function draw() {
   fill(255);
   text("Pontos: " + score, 10, 10);
 
-  // Frequência (por frames)
+  // Geração de novas bolinhas
   frameCounter++;
   if (frameCounter % BALL_SPAWN_INTERVAL === 0) {
     balls.push(createBall());
   }
 
-  // Atualiza e desenha sprites
+  // Atualiza bolinhas
   for (let ball of balls) {
     ball.y += BALL_SPEED;
 
@@ -63,19 +54,13 @@ function draw() {
       resetBall(ball);
     }
 
+    fill(0, 100, 255);
     noStroke();
-    if (spriteImg) {
-      image(spriteImg, ball.x, ball.y, SPRITE_SIZE, SPRITE_SIZE);
-    } else {
-      // fallback visual se a imagem não carregar
-      fill(0, 100, 255);
-      circle(ball.x, ball.y, ball.r * 2);
-    }
+    circle(ball.x, ball.y, ball.r * 2);
   }
 
   // Colisão com esqueleto e keypoints
   for (let pose of poses) {
-    // Conexões (linhas)
     for (let conn of connections) {
       let a = pose.keypoints[conn[0]];
       let b = pose.keypoints[conn[1]];
@@ -94,7 +79,6 @@ function draw() {
       }
     }
 
-    // Pontos do corpo
     for (let k of pose.keypoints) {
       if (k.confidence > 0.1) {
         fill(0, 255, 0);
@@ -118,22 +102,19 @@ function gotPoses(results) {
 }
 
 function createBall() {
-  // Usa raio baseado no tamanho do sprite para colisão aproximada circular
-  const r = SPRITE_SIZE / 2;
   return {
     x: random(width),
     y: random(-height, 0),
-    r
+    r: BALL_RADIUS
   };
 }
 
 function resetBall(ball) {
   ball.x = random(width);
   ball.y = random(-50, -10);
-  ball.r = SPRITE_SIZE / 2; // garante que r acompanha o tamanho atual
 }
 
-// Responsivo
+// Responsividade ao redimensionar a janela
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   video.size(windowWidth, windowHeight);
