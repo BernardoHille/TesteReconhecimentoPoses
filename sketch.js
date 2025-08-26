@@ -3,14 +3,20 @@ let bodyPose;
 let poses = [];
 let connections;
 let balls = [];
+let coinImg;                 // ← sprite da moeda
 
-// 🎛️ Configurações fáceis:
-const BALL_RADIUS = 15;
-let BALL_SPEED = 3;
-let BALL_SPAWN_INTERVAL = 120; // em frames
+// 🎛️ Configurações
+const COIN_SIZE = 48;        // tamanho desenhado do sprite
+let BALL_SPEED = 3;          // velocidade de queda
+let BALL_SPAWN_INTERVAL = 1200; // em frames (menor = mais frequente)
 
 let score = 0;
 let frameCounter = 0;
+
+function preload() {
+  // Coloque coin.webp na mesma pasta do sketch (ou ajuste o caminho)
+  coinImg = loadImage('coin.webp');
+}
 
 async function setup() {
   createCanvas(windowWidth, windowHeight);
@@ -27,6 +33,7 @@ async function setup() {
     balls.push(createBall());
   }
 
+  imageMode(CENTER);         // centraliza o sprite na posição
   textSize(32);
   textAlign(LEFT, TOP);
   fill(255);
@@ -36,17 +43,17 @@ function draw() {
   background(0);
   image(video, 0, 0, width, height);
 
-  // Pontuação
+  // HUD de pontuação
   fill(255);
   text("Pontos: " + score, 10, 10);
 
-  // Geração de novas bolinhas
+  // Frequência de novas moedas (em frames)
   frameCounter++;
   if (frameCounter % BALL_SPAWN_INTERVAL === 0) {
     balls.push(createBall());
   }
 
-  // Atualiza bolinhas
+  // Atualiza e desenha moedas
   for (let ball of balls) {
     ball.y += BALL_SPEED;
 
@@ -54,13 +61,15 @@ function draw() {
       resetBall(ball);
     }
 
-    fill(0, 100, 255);
-    noStroke();
-    circle(ball.x, ball.y, ball.r * 2);
+    // Desenha o sprite (sem fallback para circle)
+    if (coinImg) {
+      image(coinImg, ball.x, ball.y, COIN_SIZE, COIN_SIZE);
+    }
   }
 
-  // Colisão com esqueleto e keypoints
+  // Colisões com esqueleto e keypoints
   for (let pose of poses) {
+    // Conexões (linhas do esqueleto)
     for (let conn of connections) {
       let a = pose.keypoints[conn[0]];
       let b = pose.keypoints[conn[1]];
@@ -79,6 +88,7 @@ function draw() {
       }
     }
 
+    // Keypoints (juntas)
     for (let k of pose.keypoints) {
       if (k.confidence > 0.1) {
         fill(0, 255, 0);
@@ -102,19 +112,21 @@ function gotPoses(results) {
 }
 
 function createBall() {
+  // raio para colisão ~ metade do tamanho desenhado
   return {
     x: random(width),
     y: random(-height, 0),
-    r: BALL_RADIUS
+    r: COIN_SIZE / 2
   };
 }
 
 function resetBall(ball) {
   ball.x = random(width);
   ball.y = random(-50, -10);
+  ball.r = COIN_SIZE / 2; // garante consistência se você trocar COIN_SIZE
 }
 
-// Responsividade ao redimensionar a janela
+// Responsividade
 function windowResized() {
   resizeCanvas(windowWidth, windowHeight);
   video.size(windowWidth, windowHeight);
@@ -132,16 +144,9 @@ function distToSegment(px, py, x1, y1, x2, y2) {
   let param = lenSq !== 0 ? dotProduct / lenSq : -1;
 
   let xx, yy;
-  if (param < 0) {
-    xx = x1;
-    yy = y1;
-  } else if (param > 1) {
-    xx = x2;
-    yy = y2;
-  } else {
-    xx = x1 + param * C;
-    yy = y1 + param * D;
-  }
+  if (param < 0) { xx = x1; yy = y1; }
+  else if (param > 1) { xx = x2; yy = y2; }
+  else { xx = x1 + param * C; yy = y1 + param * D; }
 
   let dx = px - xx;
   let dy = py - yy;
